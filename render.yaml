@@ -2,6 +2,7 @@ services:
   - type: web
     name: ajgor-store
     env: python
+    plan: free
     buildCommand: npm install
     startCommand: npm start
     
