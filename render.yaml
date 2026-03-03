@@ -3,6 +3,5 @@ services:
     name: ajgor-store
     env: python
     plan: free
-    buildCommand: npm install
-    startCommand: npm start
-    
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
