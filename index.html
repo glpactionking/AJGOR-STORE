@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF ID Store</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #1a202c; color: white; }
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.8); }
+        .modal-content { background-color: #2d3748; margin: 5% auto; padding: 20px; border: 1px solid #4a5568; width: 95%; max-width: 600px; border-radius: 8px; }
+        .hidden { display: none; }
+        .account-card { cursor: pointer; transition: transform 0.2s; }
+        .account-card:hover { transform: translateY(-5px); }
+    </style>
+</head>
+<body>
+
+    <div id="auth-section" class="max-w-md mx-auto mt-10 p-6 bg-gray-800 rounded-lg">
+        <h2 class="text-2xl font-bold text-center mb-6">Login or Register</h2>
+        <div class="mb-4">
+            <label for="email" class="block mb-2">Email:</label>
+            <input type="email" id="email" class="w-full p-2 rounded bg-gray-700 border border-gray-600">
+        </div>
+        <div class="mb-6">
+            <label for="password" class="block mb-2">Password:</label>
+            <input type="password" id="password" class="w-full p-2 rounded bg-gray-700 border border-gray-600">
+        </div>
+        <div class="flex gap-4">
+            <button id="login-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Login</button>
+            <button id="register-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Register</button>
+        </div>
+    </div>
+
+    <div id="app-section" class="hidden">
+        <header class="bg-gray-800 p-4 flex justify-between items-center sticky top-0 z-50">
+            <div>
+                <h1 class="text-xl font-bold">FF ID Store</h1>
+                <p id="user-email" class="text-sm text-gray-400"></p>
+            </div>
+            <div>
+                <span class="font-bold">Wallet: ₹<span id="wallet-balance">0</span></span>
+                <button id="deposit-btn" class="bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-1 px-3 rounded ml-4">Deposit</button>
+                <button id="logout-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded ml-2">Logout</button>
+            </div>
+        </header>
+
+        <main id="accounts-container" class="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        </main>
+    </div>
+
+    <div id="deposit-modal" class="modal">
+        <div class="modal-content">
+            <h3 class="text-2xl font-bold mb-4">Deposit Money</h3>
+            <p class="mb-4">Scan the QR code to pay. After paying, fill the details below.</p>
+            <img src="https://uploads.onecompiler.io/42n3z3s4f/43ec2wugc/photo_2025-04-10_02-22-46.jpg" alt="QR Code" class="mx-auto mb-4 border-4 border-white">
+            <input type="text" id="payer-name" placeholder="Name you paid with" class="w-full p-2 mb-3 rounded bg-gray-700 border border-gray-600">
+            <input type="text" id="utr-id" placeholder="UTR/Transaction ID" class="w-full p-2 mb-3 rounded bg-gray-700 border border-gray-600">
+            <input type="number" id="deposit-amount" placeholder="Amount Paid" class="w-full p-2 mb-4 rounded bg-gray-700 border border-gray-600">
+            <button id="submit-deposit-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Submit Request</button>
+            <button onclick="closeModal('deposit-modal')" class="w-full mt-2 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">Close</button>
+        </div>
+    </div>
+
+    <div id="details-modal" class="modal">
+        <div class="modal-content">
+            <h3 id="modal-title" class="text-3xl font-bold mb-4"></h3>
+            <img id="modal-main-image" src="" alt="Main Account Image" class="w-full h-64 object-cover rounded-lg mb-4">
+            <h4 class="text-xl font-semibold mb-2">Description</h4>
+            <p id="modal-description" class="text-gray-300 mb-4 whitespace-pre-wrap"></p>
+             <h4 class="text-xl font-semibold mb-2">More Images</h4>
+            <div id="modal-other-images" class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-6">
+            </div>
+            <div id="modal-buttons" class="flex flex-col gap-2">
+            </div>
+            <button onclick="closeModal('details-modal')" class="w-full mt-4 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">Close</button>
+        </div>
+    </div>
+    
+    <div id="credentials-modal" class="modal">
+        <div class="modal-content text-center">
+            <h3 class="text-2xl font-bold mb-4 text-green-400">🎉 Purchase Successful! 🎉</h3>
+            <p class="mb-2">Here are your account details:</p>
+            <div class="bg-gray-900 p-4 rounded text-left">
+                <p><strong>ID/Email:</strong> <span id="purchased-id"></span></p>
+                <p><strong>Password:</strong> <span id="purchased-pass"></span></p>
+            </div>
+            <button onclick="closeModal('credentials-modal')" class="w-full mt-4 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">Close</button>
+        </div>
+    </div>
+
+    <script type="module">
+        // 🔥 CORRECT FIREBASE CONFIG FOR FF ID STORE
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getDatabase, ref, set, get, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+        const firebaseConfig = {
+  apiKey: "AIzaSyBBKLlhbTq9o76Nt2jPUQ0j5-5TPriuc7Y",
+  authDomain: "ajgorff-51f1c.firebaseapp.com",
+  databaseURL: "https://ajgorff-51f1c-default-rtdb.firebaseio.com",
+  projectId: "ajgorff-51f1c",
+  storageBucket: "ajgorff-51f1c.firebasestorage.app",
+  messagingSenderId: "1073082329378",
+  appId: "1:1073082329378:web:8218a4bfa1ad4f6d191d7b",
+  measurementId: "G-JZB4KJ9K9B"
+};
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getDatabase(app);
+
+        // DOM Elements
+        const authSection = document.getElementById('auth-section');
+        const appSection = document.getElementById('app-section');
+        const userEmailEl = document.getElementById('user-email');
+        const walletBalanceEl = document.getElementById('wallet-balance');
+        const accountsContainer = document.getElementById('accounts-container');
+        const detailsModal = document.getElementById('details-modal');
+
+        let currentUser = null;
+        let userWallet = 0;
+        let isWalletSystemDisabled = false;
+
+        // 🔥 FIXED: Auth State Listener
+        onAuthStateChanged(auth, (user) => {
+            console.log('Auth state changed:', user ? 'Logged In' : 'Logged Out');
+            if (user) {
+                currentUser = user;
+                authSection.classList.add('hidden');
+                appSection.classList.remove('hidden');
+                userEmailEl.textContent = user.email;
+                listenToWallet();
+                listenToSettings();
+                loadAccounts();
+            } else {
+                currentUser = null;
+                authSection.classList.remove('hidden');
+                appSection.classList.add('hidden');
+            }
+        });
+
+        // 🔥 FIXED: LOGIN BUTTON - 100% WORKING
+        document.getElementById('login-btn').addEventListener('click', async () => {
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            
+            console.log('Login attempt:', email);
+            
+            if (!email || !password) {
+                alert('Please fill email and password');
+                return;
+            }
+            
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                console.log('Login SUCCESS!');
+            } catch (error) {
+                console.error('Login error:', error.code, error.message);
+                if (error.code === 'auth/user-not-found') {
+                    alert('User not found! Please register first.');
+                } else if (error.code === 'auth/wrong-password') {
+                    alert('Wrong password!');
+                } else {
+                    alert('Login failed: ' + error.message);
+                }
+            }
+        });
+
+        // 🔥 FIXED: REGISTER BUTTON - 100% WORKING
+        document.getElementById('register-btn').addEventListener('click', async () => {
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            
+            console.log('Register attempt:', email);
+            
+            if (!email || !password) {
+                alert('Please fill email and password');
+                return;
+            }
+            
+            if (password.length < 6) {
+                alert('Password must be at least 6 characters');
+                return;
+            }
+            
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                console.log('Register SUCCESS!', userCredential.user.uid);
+                // Create wallet for new user
+                await set(ref(db, `users/${userCredential.user.uid}/wallet`), 0);
+                alert('Registration successful! You are now logged in.');
+            } catch (error) {
+                console.error('Register error:', error.code, error.message);
+                if (error.code === 'auth/email-already-in-use') {
+                    alert('Email already registered! Please login.');
+                } else {
+                    alert('Registration failed: ' + error.message);
+                }
+            }
+        });
+
+        // Logout
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            signOut(auth);
+            console.log('Logged out');
+        });
+
+        // Close Modal Function
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        function listenToWallet() {
+            const userWalletRef = ref(db, `users/${currentUser.uid}/wallet`);
+            onValue(userWalletRef, (snapshot) => {
+                userWallet = snapshot.val() || 0;
+                walletBalanceEl.textContent = userWallet.toFixed(2);
+            });
+        }
+
+        function listenToSettings() {
+            const settingsRef = ref(db, `settings/isWalletDisabled`);
+            onValue(settingsRef, (snapshot) => {
+                isWalletSystemDisabled = snapshot.val() === true;
+            });
+        }
+
+        function loadAccounts() {
+            const accountsRef = ref(db, 'accounts');
+            onValue(accountsRef, (snapshot) => {
+                accountsContainer.innerHTML = '';
+                const data = snapshot.val();
+                console.log('Accounts loaded:', data);
+                if (data) {
+                    Object.entries(data).forEach(([key, value]) => {
+                        const card = createAccountCard(key, value);
+                        accountsContainer.appendChild(card);
+                    });
+                } else {
+                    accountsContainer.innerHTML = '<p class="text-center col-span-full">No accounts available right now.</p>';
+                }
+            });
+        }
+
+        function createAccountCard(id, data) {
+            const card = document.createElement('div');
+            card.className = 'bg-gray-800 rounded-lg overflow-hidden shadow-lg account-card';
+            card.dataset.id = id;
+
+            const shortDescription = data.description.split('\n')[0].substring(0, 60) + '...';
+
+            card.innerHTML = `
+                <img class="w-full h-48 object-cover" src="${data.mainImage}" alt="${data.name}" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'">
+                <div class="p-4">
+                    <h3 class="font-bold text-xl mb-2">${data.name}</h3>
+                    <p class="text-gray-400 text-sm">${shortDescription}</p>
+                    <p class="text-green-400 font-bold mt-2">₹${data.price}</p>
+                </div>
+            `;
+            return card;
+        }
+
+        accountsContainer.addEventListener('click', async (e) => {
+            const card = e.target.closest('.account-card');
+            if (card) {
+                const accountId = card.dataset.id;
+                showDetailsModal(accountId);
+            }
+        });
+
+        async function showDetailsModal(accountId) {
+            const accountRef = ref(db, `accounts/${accountId}`);
+            const snapshot = await get(accountRef);
+            if (!snapshot.exists()) {
+                alert("This account is no longer available.");
+                return;
+            }
+            const data = snapshot.val();
+
+            document.getElementById('modal-title').textContent = data.name;
+            document.getElementById('modal-main-image').src = data.mainImage;
+            document.getElementById('modal-description').textContent = data.description;
+
+            const otherImagesContainer = document.getElementById('modal-other-images');
+            otherImagesContainer.innerHTML = '';
+            if(data.otherImages && data.otherImages.length > 0) {
+                data.otherImages.forEach(imgUrl => {
+                    const img = document.createElement('img');
+                    img.src = imgUrl;
+                    img.className = 'w-full h-32 object-cover rounded';
+                    otherImagesContainer.appendChild(img);
+                });
+            } else {
+                otherImagesContainer.innerHTML = '<p class="text-gray-400 col-span-full">No other images available.</p>';
+            }
+
+            const buttonsContainer = document.getElementById('modal-buttons');
+            let buttonsHtml = `<a href="${data.contactLink}" target="_blank" class="block w-full text-center bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">Contact Owner</a>`;
+            if (!isWalletSystemDisabled || userWallet >= data.price) {
+                buttonsHtml += `<button data-id="${accountId}" class="buy-btn w-full text-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Buy Now (₹${data.price})</button>`;
+            }
+            buttonsContainer.innerHTML = buttonsHtml;
+            
+            detailsModal.style.display = 'block';
+        }
+
+        document.addEventListener('click', async (e) => {
+            if (e.target.classList.contains('buy-btn')) {
+                const accountId = e.target.dataset.id;
+                await handleBuy(accountId);
+            }
+        });
+
+        async function handleBuy(accountId) {
+            if (!confirm("Are you sure you want to buy this account?")) return;
+
+            const accountRef = ref(db, `accounts/${accountId}`);
+            const accountSnapshot = await get(accountRef);
+            if (!accountSnapshot.exists()) {
+                alert("This account is no longer available.");
+                return;
+            }
+            const accountData = accountSnapshot.val();
+
+            if (userWallet < accountData.price) {
+                alert("Insufficient balance! Need ₹" + accountData.price + " but have ₹" + userWallet);
+                return;
+            }
+
+            const newBalance = userWallet - accountData.price;
+            await set(ref(db, `users/${currentUser.uid}/wallet`), newBalance);
+            await remove(accountRef);
+
+            closeModal('details-modal');
+            document.getElementById('purchased-id').textContent = accountData.ffId;
+            document.getElementById('purchased-pass').textContent = accountData.ffPassword;
+            document.getElementById('credentials-modal').style.display = 'block';
+        }
+
+        document.getElementById('deposit-btn').addEventListener('click', () => {
+            document.getElementById('deposit-modal').style.display = 'block';
+        });
+
+        document.getElementById('submit-deposit-btn').addEventListener('click', () => {
+            const name = document.getElementById('payer-name').value.trim();
+            const utr = document.getElementById('utr-id').value.trim();
+            const amount = parseFloat(document.getElementById('deposit-amount').value);
+
+            if (!name || !utr || !amount || amount <= 0) {
+                alert('Please fill all fields correctly.');
+                return;
+            }
+
+            const requestId = `req_${Date.now()}`;
+            const requestRef = ref(db, `depositRequests/${requestId}`);
+            set(requestRef, {
+                userId: currentUser.uid,
+                userEmail: currentUser.email,
+                payerName: name,
+                utr: utr,
+                amount: amount,
+                timestamp: new Date().toISOString()
+            }).then(() => {
+                alert('✅ Deposit request sent! Admin will approve soon.');
+                closeModal('deposit-modal');
+                document.getElementById('payer-name').value = '';
+                document.getElementById('utr-id').value = '';
+                document.getElementById('deposit-amount').value = '';
+            }).catch(err => {
+                console.error(err);
+                alert('Error: ' + err.message);
+            });
+        });
+
+        console.log('🚀 FF ID Store Loaded Successfully!');
+    </script>
+</body>
+</html>
