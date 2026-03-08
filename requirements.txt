@@ -1,7 +1,0 @@
-pyTelegramBotAPI
-requests
-psycopg2-binary
-python-dotenv
-aiohttp
-aiogram
-razorpay
